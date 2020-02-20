@@ -1,0 +1,178 @@
+﻿<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+
+@page "/"
+@using System.Threading; 
+@inject Services.BlazorTimer Timer
+<h3>Eshu Puzzle Game</h3>
+<label class="label label-default">Passed Time : @countDown</label>
+<label class="label label-default">Active Difficulty : @aSize</label> 
+<label class="label label-default">Found = @found</label> 
+<label class="label label-default">Try Count = @nFound</label>
+<label class="label label-default">Score = @score</label><br />
+<label class="label label-default">Set Degree of Difficulty </label>
+<input class="form-control" placeholder="Enter 4-50 number" type="number" @bind="aSize" >
+<button class="btn btn-success" @onclick="fillRandoms" @onmouseup="AsyncIncCounter">Reset And Start Game</button><br />
+
+
+@if (puzzle != null)
+{
+    foreach (var item in puzzle)
+    {
+        <img class="img-circle" src="@item.src" @onclick="@(()=> setImg(item))" width="100" height="100" />
+        if ((item.id != 0) && ((item.id % 5) == 0 ))
+        {
+            <br />
+        }
+    }
+}
+
+@code{
+    //increase size to increase the hardness of game
+    static int aSize = 10;
+    
+    //base class for puzzle
+    public class pItm
+    {
+        public int id;
+        public bool shown;
+        public int fId;
+        public String src => shown ? $"{"./resources/images/" + fId.ToString()}.jpg" : "./resources/images/0.jpg";
+    }
+
+    //create list for puzzle based on puzzle item
+    public List<pItm> puzzle; 
+
+    //generate randomized arrays for randomize puzzle items
+    private int[] rndFId1 = new int[aSize];
+    private int[] rndFId2 = new int[aSize];
+    private static int[] rndFId = new int[aSize * 2];
+
+    private int randomNumber()
+    {
+        Random rnd = new Random();
+        return rnd.Next(1, aSize + 1);
+    }
+    public void resetVals(){
+        prevId = -99;
+        prevFId = -99;
+        score = 0;
+        found = 0;
+        nFound = 0;
+        tickCnt = 0;
+        aFId = 0;
+        countDown=0;
+    }
+    //passed times?
+    int countDown=0;
+    void CalcTime(){ 
+           Task.Delay(1000).Wait();    
+    }
+    async Task AsyncIncCounter()
+    {        
+        resetVals();         
+        while (found!=aSize)
+        {
+            await Task.Run(()=> CalcTime());
+            countDown++;            
+            await Task.CompletedTask;
+            StateHasChanged();
+        }
+    }
+    private void fillRandoms()
+    {
+        int founded;       
+        Array.Resize(ref rndFId1,aSize);
+        Array.Resize(ref rndFId2,aSize);
+        Array.Resize(ref rndFId,aSize*2);
+        Array.Clear(rndFId1,0,rndFId1.Length);
+        Array.Clear(rndFId2,0,rndFId2.Length);
+        Array.Clear(rndFId,0,rndFId.Length);
+        for (int k = 0; k < aSize; k++)
+        {
+            founded = randomNumber();            
+            while (rndFId1.Contains(founded))
+            {
+                founded = randomNumber();
+            }
+            rndFId1[k] = founded;
+            founded = randomNumber();
+            while (rndFId2.Contains(founded))
+            {
+                founded = randomNumber();
+            }
+            rndFId2[k] = founded;
+        }
+        Array.Copy(rndFId1, rndFId, rndFId1.Length);
+        Array.Copy(rndFId2, 0, rndFId, rndFId1.Length, rndFId2.Length);
+        Random rng = new Random();
+        for (int p = 0; p < rndFId.Length; p++)
+        {
+            int swpInd = rng.Next(p+1);
+            if (swpInd != p){
+                int t = rndFId[swpInd];
+                rndFId[swpInd] = rndFId[p];
+                rndFId[p] = t;
+            }
+        }
+        puzzle = Enumerable.Range(0, aSize * 2).Select(i => new pItm { id = i + 1, fId = rndFId[i] }).ToList();
+    }
+
+    public int prevId = -99;
+    public int prevFId = -99;
+    public double score = 0.00;
+    public int found = 0;
+    public int nFound = 0;
+    public int tickCnt = 0;
+    public int aFId = 0;
+    //**************play game 
+    public void setToBlack(int aid){
+        for (int i = 0; i < puzzle.Count; i++)
+        {
+            if (puzzle[i].fId != -1)  {
+                puzzle[i].shown = false;
+            }
+            
+        }
+    }
+    public void setImg(pItm itm)
+    {        
+        //if selected same item then return
+        if (prevId==itm.id){
+            return;
+        }
+        tickCnt ++;            
+        if (tickCnt==3){
+            setToBlack(itm.id);
+            tickCnt = 0;
+            prevFId = -99;
+            prevId = -99;
+            nFound++;
+            score = (5*found)-(nFound*2*countDown/100);
+            return;
+        }
+        //if first selection
+        if (prevFId==-99){
+            itm.shown = !itm.shown;
+            prevFId = itm.fId;
+            prevId = itm.id;            
+            return;
+        }
+        //if selected items differs turn to black
+        if (prevFId != itm.fId){                                                                     
+            itm.shown = !itm.shown;
+            prevFId = -99;
+            prevId = -99;                                  
+            return;
+        }
+        if (prevFId == itm.fId){
+            itm.fId=-1;
+            puzzle[prevId-1].fId = -1;
+            itm.shown = !itm.shown;
+            found++;
+            score = (5*found)-(nFound*2*countDown/100);
+            return;
+        }        
+    
+    }
+    
+}
